@@ -1,0 +1,2 @@
+class OpenCVAdapter:
+    pass
