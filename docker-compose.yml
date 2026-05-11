@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: opendata_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: opendata_db
+    ports:
+      # Bilgisayarının 5432 portunu, Docker içindeki 5432 portuna bağlar
+      - "5432:5432"
+    volumes:
+      # Verilerin Docker kapandığında silinmemesi için kalıcı alan yaratır
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
