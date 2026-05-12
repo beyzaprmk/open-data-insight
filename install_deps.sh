@@ -47,18 +47,7 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 
   python -m pip install --upgrade pip
-  python -m pip install \
-    fastapi \
-    "uvicorn[standard]" \
-    sqlalchemy \
-    psycopg2-binary \
-    pydantic \
-    python-dotenv \
-    httpx \
-    opencv-python \
-    cloudinary \
-    google-generativeai \
-    psycopg2-binary
+  python -m pip install -r "$BACKEND_DIR/requirements.txt"
 else
   echo "python3 not found"
   exit 1

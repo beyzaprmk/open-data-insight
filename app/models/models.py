@@ -43,6 +43,7 @@ class Dataset(Base):
     collaborations: Mapped[List["Collaboration"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     labels: Mapped[List["Label"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     analysis_results: Mapped[List["AnalysisResult"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
+    data_files: Mapped[List["DataFile"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
 
 
 class DatasetImage(Base):
@@ -148,3 +149,35 @@ class BoundingBox(Base):
 
     # Relationships
     analysis_result: Mapped["AnalysisResult"] = relationship(back_populates="bboxes")
+
+
+class DataFile(Base):
+    """
+    Represents text files containing image data and labels stored in Cloudinary.
+    All files are public and users can upload/delete their own files.
+    """
+    __tablename__ = "data_files"
+
+    file_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[int] = mapped_column(ForeignKey("datasets.dataset_id"), nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., 'txt', 'csv', 'json'
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)  # size in bytes
+    
+    # Cloudinary storage information
+    cloud_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    cloud_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    
+    # Content metadata
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'image_data', 'labels', 'mixed'
+    description: Mapped[Optional[str]] = mapped_column(String(500))
+    
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    dataset: Mapped["Dataset"] = relationship()
+    uploader: Mapped["User"] = relationship()
