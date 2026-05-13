@@ -94,6 +94,57 @@ def get_public_datasets_dashboard(session: Session = Depends(get_db)):
 
 
 @router.get(
+    "/public/search",
+    summary="Search and filter public datasets",
+    description="Get public datasets with advanced filtering by name, tags, and data status"
+)
+def search_public_datasets(
+    search: Optional[str] = Query(None, description="Search by dataset name (partial match)"),
+    tags: Optional[str] = Query(None, description="Filter by tag types (comma-separated, e.g., 'Cat,Dog,Human')"),
+    status: Optional[str] = Query(None, description="Filter by data status ('Tagged' or 'Raw')"),
+    session: Session = Depends(get_db)
+):
+    """
+    Search and filter public datasets with advanced criteria.
+    
+    Query Parameters:
+    - search: Dataset name keyword (partial match, case-insensitive)
+    - tags: Comma-separated list of label names (e.g., 'Cat,Dog,Human')
+    - status: Data status filter ('Tagged' for labeled datasets, 'Raw' for unlabeled)
+    
+    Example: /api/datasets/public/search?search=animals&tags=Cat,Dog&status=Tagged
+    """
+    try:
+        # Parse tags from comma-separated string
+        tag_list = None
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        
+        service = DatasetService(session)
+        datasets = service.get_public_datasets_filtered(
+            search_keyword=search,
+            tag_types=tag_list,
+            data_status=status
+        )
+        
+        return {
+            "status": "success",
+            "count": len(datasets),
+            "filters": {
+                "search": search,
+                "tags": tag_list,
+                "data_status": status
+            },
+            "datasets": datasets
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get(
     "/{dataset_id}",
     response_model=DatasetResponse,
     summary="Get dataset",

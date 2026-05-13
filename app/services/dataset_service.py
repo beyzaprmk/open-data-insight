@@ -65,6 +65,46 @@ class DatasetService:
             result.append(dataset_dict)
         return result
 
+    def get_public_datasets_filtered(
+        self,
+        search_keyword: Optional[str] = None,
+        tag_types: Optional[List[str]] = None,
+        data_status: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Get public datasets with advanced filtering and their images.
+        
+        Args:
+            search_keyword: Filter by dataset name (partial match)
+            tag_types: Filter by label names (e.g., ['Cat', 'Dog', 'Human'])
+            data_status: Filter by data status ('Tagged' for is_labeled=True, 'Raw' for is_labeled=False)
+        
+        Returns:
+            List of filtered datasets with their images
+        """
+        datasets = self.repository.get_public_datasets_filtered(
+            search_keyword=search_keyword,
+            tag_types=tag_types,
+            data_status=data_status
+        )
+        result = []
+        for dataset in datasets:
+            dataset_dict = self._dataset_to_dict(dataset)
+            # Get images for this dataset
+            images = self.image_repository.get_by_dataset_id(dataset.dataset_id)
+            dataset_dict["images"] = [
+                {
+                    "image_id": img.image_id,
+                    "file_name": img.file_name,
+                    "cloud_path": img.cloud_path,
+                    "file_type": img.file_type,
+                    "uploaded_at": img.uploaded_at.isoformat(),
+                }
+                for img in images
+            ]
+            result.append(dataset_dict)
+        return result
+
     def update_dataset(
         self,
         dataset_id: int,

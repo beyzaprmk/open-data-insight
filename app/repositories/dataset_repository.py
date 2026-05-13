@@ -1,7 +1,8 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
 from datetime import datetime
-from app.models.models import Dataset, DataFile, User
+from app.models.models import Dataset, DataFile, User, Label
 
 
 class DatasetRepository:
@@ -74,3 +75,39 @@ class DatasetRepository:
     def get_dataset_file_count(self, dataset_id: int) -> int:
         """Get count of files in a dataset."""
         return self.session.query(DataFile).filter(DataFile.dataset_id == dataset_id).count()
+
+    def get_public_datasets_filtered(
+        self,
+        search_keyword: Optional[str] = None,
+        tag_types: Optional[List[str]] = None,
+        data_status: Optional[str] = None
+    ) -> List[Dataset]:
+        """
+        Get public datasets with advanced filtering.
+        
+        Args:
+            search_keyword: Filter by dataset name (partial match)
+            tag_types: Filter by label names (e.g., ['Cat', 'Dog', 'Human'])
+            data_status: Filter by data status ('Tagged' for is_labeled=True, 'Raw' for is_labeled=False)
+        
+        Returns:
+            List of filtered Dataset objects
+        """
+        query = self.session.query(Dataset).filter(Dataset.visibility == True)
+        
+        # Filter by search keyword (dataset name)
+        if search_keyword and search_keyword.strip():
+            query = query.filter(Dataset.name.ilike(f"%{search_keyword}%"))
+        
+        # Filter by data status (Tagged/Raw)
+        if data_status:
+            if data_status.lower() == "tagged":
+                query = query.filter(Dataset.is_labeled == True)
+            elif data_status.lower() == "raw":
+                query = query.filter(Dataset.is_labeled == False)
+        
+        # Filter by tag types (labels)
+        if tag_types and len(tag_types) > 0:
+            query = query.join(Label).filter(Label.label_name.in_(tag_types)).distinct()
+        
+        return query.all()
