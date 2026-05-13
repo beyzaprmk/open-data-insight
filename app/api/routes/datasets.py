@@ -67,6 +67,33 @@ def create_dataset(
 
 
 @router.get(
+    "/public",
+    summary="Get public datasets for dashboard",
+    description="Get all public datasets with their images (no authentication required)"
+)
+def get_public_datasets_dashboard(session: Session = Depends(get_db)):
+    """
+    Get all public datasets with their images from Cloudinary.
+    This endpoint is accessible without authentication for the public dashboard.
+    
+    Returns datasets where visibility=true with all associated images.
+    """
+    try:
+        service = DatasetService(session)
+        datasets = service.get_public_datasets_with_images()
+        return {
+            "status": "success",
+            "count": len(datasets),
+            "datasets": datasets
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get(
     "/{dataset_id}",
     response_model=DatasetResponse,
     summary="Get dataset",
