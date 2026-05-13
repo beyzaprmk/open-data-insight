@@ -6,9 +6,10 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from dotenv import load_dotenv
 
 from app.models.models import Base
-from app.api.routes import health, data_files, datasets
+from app.api.routes import health, data_files, datasets, ai
 from app.services.data_file_service import DataFileService
 
 
@@ -42,6 +43,9 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Create FastAPI app
 app = FastAPI(
@@ -88,6 +92,7 @@ def health_check():
 app.include_router(health.router, tags=["health"])
 app.include_router(datasets.router, tags=["datasets"])
 app.include_router(data_files.router, tags=["data-files"])
+app.include_router(ai.router, tags=["ai"])
 
 
 # Root endpoint

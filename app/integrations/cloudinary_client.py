@@ -1,3 +1,4 @@
+import io
 import os
 from typing import Optional, Dict, List
 import cloudinary
@@ -6,11 +7,7 @@ import cloudinary.api
 
 
 class CloudinaryClient:
-    """
-    Client for managing file uploads/downloads with Cloudinary.
-    Handles text files containing image data and labels.
-    All files are stored as public resources.
-    """
+   
 
     def __init__(self):
         """Initialize Cloudinary with credentials from environment variables."""
@@ -19,6 +16,9 @@ class CloudinaryClient:
             api_key=os.getenv("CLOUDINARY_API_KEY"),
             api_secret=os.getenv("CLOUDINARY_API_SECRET"),
         )
+        
+        # Tüm dosyalar için tek klasör kullan
+        self.base_folder = os.getenv("CLOUDINARY_BASE_FOLDER", "datasets")
 
     def upload_text_file(
         self,
@@ -27,35 +27,25 @@ class CloudinaryClient:
         dataset_id: int,
         content_type: str = "labels"
     ) -> Dict[str, str]:
-        """
-        Upload a text file containing image data or labels to Cloudinary.
 
-        Args:
-            file_content: The text content to upload
-            file_name: Original file name
-            dataset_id: Dataset ID for organization
-            content_type: Type of content ('image_data', 'labels', 'mixed')
-
-        Returns:
-            Dict containing cloud_id, cloud_url, file_size, file_type
-
-        Raises:
-            Exception: If upload fails
-        """
+        
         try:
-            # Create a resource name based on dataset and file
+            # Tüm dosyalar base_folder'a yüklenir
+            folder = self.base_folder
+            
+            # Dataset bazlı alt klasör oluştur (folder parametresi zaten klasörü belirtiyor)
             resource_name = f"dataset_{dataset_id}/{file_name.split('.')[0]}"
+            
+            # Convert string content to bytes for raw upload
+            content_bytes = file_content.encode('utf-8')
             
             # Upload as text resource with public access
             result = cloudinary.uploader.upload(
-                file_content,
+                io.BytesIO(content_bytes),
                 resource_type="raw",  # raw resources for non-image files
                 public_id=resource_name,
-                access_control=[
-                    {"access_type": "token", "start": None, "end": None}
-                ],  # allow public access
                 overwrite=True,
-                folder="datasets",
+                folder=folder,
             )
 
             return {
@@ -98,9 +88,10 @@ class CloudinaryClient:
             List of file metadata dictionaries
         """
         try:
+            # Sadece base_folder'da ara
             resources = cloudinary.api.resources(
                 type="upload",
-                prefix=f"datasets/dataset_{dataset_id}",
+                prefix=f"{self.base_folder}/dataset_{dataset_id}",
                 max_results=500
             )
             
@@ -112,6 +103,7 @@ class CloudinaryClient:
                     "cloud_url": resource.get("secure_url"),
                     "file_size": resource.get("bytes", 0),
                     "created_at": resource.get("created_at"),
+                    "folder": self.base_folder,
                 })
             
             return files
