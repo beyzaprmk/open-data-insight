@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from app.services.ai_service import AIService
 from app.services.analysis_service import AnalysisService
 from app.database import get_db
+from app.models.models import AnalysisResult
 
 router = APIRouter(
     prefix="/api/ai",
@@ -11,31 +12,21 @@ router = APIRouter(
 )
 
 
-@router.post("/analyze/{dataset_id}")
+@router.post("/analyze/{dataset_id}", status_code=status.HTTP_202_ACCEPTED)
 def analyze_dataset(
     dataset_id: int,
+    background_tasks: BackgroundTasks,
     user_id: int = Query(..., description="User ID performing the analysis"),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Perform computer vision analysis on dataset images and store results.
-    
-    This endpoint:
-    1. Analyzes images using computer vision
-    2. Creates string summaries of CV metrics
-    3. Stores results in the database
-    4. Returns analysis results
-    
-    Args:
-        dataset_id: ID of the dataset to analyze
-        user_id: ID of the user (required for authorization)
-
-    Returns:
-        Dict containing analysis results with metrics and summary
+    Kullanıcı arayüzünü (Vue.js) bloklamadan analizleri başlatır.
+    İsteğe anında 202 Accepted yanıtı dönülür.
+    Analiz motoru, arka planda (background tasks) çalıştırılır.
     """
     try:
         analysis_service = AnalysisService(db)
-        result = analysis_service.analyze_dataset(dataset_id, user_id)
+        result = analysis_service.start_analysis_background(dataset_id, user_id, background_tasks)
 
         if not result.get("success", False):
             raise HTTPException(
@@ -49,6 +40,29 @@ def analyze_dataset(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/status/{analysis_id}")
+def check_analysis_status(
+    analysis_id: int,
+    user_id: int = Query(..., description="User ID checks for ownership"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Arka planda çalışan analiz görevinin durumunu takip etmek için kullanılır.
+    Vue.js tarafı Polling (örn. her 3 saniyede bir) yaparak sonucu öğrenebilir.
+    """
+    analysis = db.query(AnalysisResult).filter(AnalysisResult.analysis_id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+        
+    if analysis.dataset.owner_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this analysis")
+
+    return {
+        "analysis_id": analysis.analysis_id,
+        "status": analysis.status,
+        "error_message": analysis.error_message
+    }
 
 
 @router.post("/process/{analysis_id}")

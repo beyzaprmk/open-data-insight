@@ -111,14 +111,18 @@ class AnalysisResult(Base):
     analysis_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     dataset_id: Mapped[int] = mapped_column(ForeignKey("datasets.dataset_id"), nullable=False)
     
-    # EER'deki Analiz Metrikleri
-    brightness_score: Mapped[float] = mapped_column(Float, nullable=False)
-    contrast_score: Mapped[float] = mapped_column(Float, nullable=False)
-    blurriness_score: Mapped[float] = mapped_column(Float, nullable=False)
-    avg_object_count: Mapped[float] = mapped_column(Float, nullable=False)
+    # İşlem Durumu (Background task takibi için)
+    status: Mapped[str] = mapped_column(String(50), default="processing")  # processing, completed, failed
+    error_message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # EER'deki Analiz Metrikleri (Başlangıçta boş olabilir)
+    brightness_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    contrast_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    blurriness_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    avg_object_count: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Sınıf dağılımı için JSON alan
-    class_distribution: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    class_distribution: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Özel CV analizleri için esneklik bayrakları
