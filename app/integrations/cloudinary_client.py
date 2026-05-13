@@ -20,6 +20,38 @@ class CloudinaryClient:
         # Tüm dosyalar için tek klasör kullan
         self.base_folder = os.getenv("CLOUDINARY_BASE_FOLDER", "datasets")
 
+    def upload_file(
+        self,
+        file_bytes: bytes,
+        file_name: str,
+        dataset_id: int,
+        resource_type: str = "auto"
+    ) -> Dict[str, str]:
+        """
+        Uploads any type of file (image, text, etc.) to Cloudinary.
+        """
+        try:
+            folder = self.base_folder
+            resource_name = f"dataset_{dataset_id}/{file_name.split('.')[0]}"
+            
+            result = cloudinary.uploader.upload(
+                io.BytesIO(file_bytes),
+                resource_type=resource_type,
+                public_id=resource_name,
+                overwrite=True,
+                folder=folder,
+            )
+
+            return {
+                "cloud_id": result.get("public_id"),
+                "cloud_url": result.get("secure_url"),
+                "file_size": result.get("bytes", 0),
+                "file_type": result.get("format", file_name.split('.')[-1]),
+                "resource_type": resource_type
+            }
+        except Exception as e:
+            raise Exception(f"Failed to upload file to Cloudinary: {str(e)}")
+
     def upload_text_file(
         self,
         file_content: str,

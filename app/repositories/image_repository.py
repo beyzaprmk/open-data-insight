@@ -11,6 +11,37 @@ class ImageRepository:
         """Initialize with a SQLAlchemy session."""
         self.session = session
 
+    def create_image(
+        self,
+        dataset_id: int,
+        uploaded_by: int,
+        cloud_path: str,
+        file_name: str,
+        file_type: str,
+        is_labeled: bool = False
+    ) -> DatasetImage:
+        """Create a new dataset image record."""
+        image = DatasetImage(
+            dataset_id=dataset_id,
+            cloud_path=cloud_path,
+            file_name=file_name,
+            file_type=file_type,
+            is_labeled=is_labeled,
+            uploaded_by=uploaded_by
+        )
+        self.session.add(image)
+        self.session.commit()
+        return image
+
+    def get_by_id(self, image_id: int) -> Optional[DatasetImage]:
+        return self.session.query(DatasetImage).filter(DatasetImage.image_id == image_id).first()
+
+    def get_by_dataset_id(self, dataset_id: int) -> List[DatasetImage]:
+        """Get all images for a dataset."""
+        return self.session.query(DatasetImage).filter(
+            DatasetImage.dataset_id == dataset_id
+        ).order_by(DatasetImage.uploaded_at.desc()).all()
+
 
 class DataFileRepository:
     """Repository for DataFile (text files with image data and labels) operations."""

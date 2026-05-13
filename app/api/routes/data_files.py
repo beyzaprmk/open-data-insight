@@ -1,10 +1,10 @@
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.services.data_file_service import DataFileService
-
+from app.database import get_db
 
 # Request/Response models
 class FileUploadRequest(BaseModel):
@@ -53,14 +53,44 @@ router = APIRouter(
     tags=["data-files"]
 )
 
-
-# Dependency to get database session (placeholder - replace with actual DB dependency)
-def get_db():
-    # This should be replaced with actual database session logic
-    pass
-
-
 # Endpoints
+@router.post(
+    "/{dataset_id}/upload_batch",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload multiple files (folder) to a dataset",
+    description="Upload a folder or selection of image/text files to a dataset"
+)
+async def upload_files_batch(
+    dataset_id: int,
+    files: List[UploadFile] = File(...),
+    user_id: int = Query(..., description="User ID of uploader"),
+    content_type: str = Query("mixed", description="Type of content ('image_data', 'labels', 'mixed')"),
+    description: Optional[str] = Query(None, description="Optional file description"),
+    is_public: bool = Query(True, description="Whether files are publicly accessible"),
+    session: Session = Depends(get_db)
+):
+    """
+    Kullanıcının seçtiği bir klasörü (veya çoklu dosyayı) Cloudinary'e yükler.
+    Desteklenen dosya tipleri: Resim (jpg, png vb.) ve Metin (txt, json vb.).
+    """
+    try:
+        service = DataFileService(session)
+        # Çoklu yükleme için servis çağrısı (await ile)
+        results = await service.upload_multiple_files(
+            dataset_id=dataset_id,
+            user_id=user_id,
+            files=files,
+            content_type=content_type,
+            description=description,
+            is_public=is_public
+        )
+        return {"uploaded_files": results}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
 @router.post(
     "/{dataset_id}/files",
     response_model=FileUploadResponse,

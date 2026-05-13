@@ -1,9 +1,8 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from app.integrations.cloudinary_client import CloudinaryClient
-from app.repositories.image_repository import DataFileRepository
+from app.repositories.image_repository import DataFileRepository, ImageRepository
 from app.models.models import DataFile
-
 
 class DataFileService:
     """Service for managing data files (text files with image data and labels)."""
@@ -13,6 +12,7 @@ class DataFileService:
         self.session = session
         self.cloudinary_client = CloudinaryClient()
         self.repository = DataFileRepository(session)
+        self.image_repository = ImageRepository(session)
 
     def upload_file(
         self,
@@ -77,6 +77,94 @@ class DataFileService:
             }
         except Exception as e:
             raise Exception(f"Failed to upload file: {str(e)}")
+
+    async def upload_multiple_files(
+        self,
+        dataset_id: int,
+        user_id: int,
+        files: List[Any], # List[UploadFile] expected
+        content_type: str = "mixed",
+        description: Optional[str] = None,
+        is_public: bool = True
+    ) -> List[Dict]:
+        """
+        Gelen birden fazla dosyayı (görsel, text, vs.) Cloudinary'ye yükler.
+        Klasör yüklendiğinde FastAPI tarafından liste halinde (UploadFile) alınır.
+        """
+        uploaded_records = []
+        for file in files:
+            try:
+                # Dosyayı oku
+                file_bytes = await file.read()
+                file_name = file.filename
+
+                # Cloudinary format tespiti (basit kontrol)
+                resource_type = "auto"
+                if file.content_type and file.content_type.startswith("image/"):
+                    resource_type = "image"
+                elif file.content_type and file.content_type.startswith("text/"):
+                    resource_type = "raw"
+
+                cloud_info = self.cloudinary_client.upload_file(
+                    file_bytes=file_bytes,
+                    file_name=file_name,
+                    dataset_id=dataset_id,
+                    resource_type=resource_type
+                )
+                
+                # Veritabanına kaydet
+                file_type = file_name.split(".")[-1] if "." in file_name else "bin"
+                
+                if resource_type == "image":
+                    # Görseller DatasetImage olarak kaydedilir
+                    data_file = self.image_repository.create_image(
+                        dataset_id=dataset_id,
+                        uploaded_by=user_id,
+                        cloud_path=cloud_info.get("cloud_url"),
+                        file_name=file_name,
+                        file_type=file_type,
+                    )
+                    
+                    uploaded_records.append({
+                        "file_id": data_file.image_id,
+                        "file_name": data_file.file_name,
+                        "cloud_url": data_file.cloud_path,
+                        "content_type": resource_type,
+                        "created_at": data_file.uploaded_at.isoformat(),
+                        "status": "success"
+                    })
+                else:
+                    # Diğer dosyalar DataFile olarak kaydedilir (örn: etiketler)
+                    data_file = self.repository.create_data_file(
+                        dataset_id=dataset_id,
+                        uploaded_by=user_id,
+                        file_name=file_name,
+                        file_type=file_type,
+                        file_size=cloud_info.get("file_size", 0),
+                        cloud_id=cloud_info.get("cloud_id"),
+                        cloud_url=cloud_info.get("cloud_url"),
+                        content_type=content_type,
+                        description=description,
+                        is_public=is_public
+                    )
+                    
+                    uploaded_records.append({
+                        "file_id": data_file.file_id,
+                        "file_name": data_file.file_name,
+                        "cloud_url": data_file.cloud_url,
+                        "file_size": data_file.file_size,
+                        "content_type": data_file.content_type,
+                        "created_at": data_file.created_at.isoformat(),
+                        "is_public": data_file.is_public,
+                        "status": "success"
+                    })
+            except Exception as e:
+                uploaded_records.append({
+                    "file_name": file.filename,
+                    "status": "error",
+                    "error_message": str(e)
+                })
+        return uploaded_records
 
     def delete_file(self, file_id: int, user_id: int) -> bool:
         """
