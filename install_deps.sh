@@ -55,10 +55,43 @@ fi
 
 install_node
 if [ -d "$FRONTEND_DIR" ]; then
-  (cd "$FRONTEND_DIR" && npm install)
+    echo "Configuring frontend dependencies..."
+    cd "$FRONTEND_DIR"
+
+    # Eğer package.json yoksa sıfırdan oluştur ve kütüphaneleri kur
+    if [ ! -f "package.json" ]; then
+        echo "package.json not found. Initializing Vue 3 + Vite project..."
+        
+        # Boş bir package.json oluşturur
+        npm init -y
+        
+        # Gerekli tüm Vue, Pinia, Router ve Axios kütüphanelerini kurar
+        echo "Installing production dependencies (Vue, Pinia, Router, Axios)..."
+        npm install vue pinia vue-router axios
+        
+        # Geliştirici araçlarını (Vite) kurar
+        echo "Installing development dependencies (Vite)..."
+        npm install --save-dev vite @vitejs/plugin-vue
+
+        # package.json içine "npm run dev" komutunu otomatik ekler
+        # Node.js kullanarak scripts altına dev komutunu güvenli bir şekilde enjekte ediyoruz
+        node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('package.json'));
+        pkg.scripts = { ...pkg.scripts, 'dev': 'vite' };
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        "
+    else
+        # Eğer package.json zaten varsa sadece normal yükleme/güncelleme yap
+        echo "package.json found. Running standard npm install..."
+        npm install
+    fi
+    
+    # Ana dizine geri dön
+    cd "$ROOT_DIR"
 else
-  echo "frontend directory not found: $FRONTEND_DIR"
-  exit 1
+    echo "frontend directory not found: $FRONTEND_DIR"
+    exit 1
 fi
 
 echo "Dependency installation completed."
